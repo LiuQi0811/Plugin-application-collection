@@ -1,0 +1,1 @@
+window.alert("Init Content Script !!!");

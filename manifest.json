@@ -1,0 +1,28 @@
+{
+	"name": "__MSG_Plugin_", // 插件的名称，这里使用了国际化占位符 __MSG_Plugin_，实际名称会在 _locales 目录下的语言文件中定义
+	"description": "__MSG_description__", // 插件的描述信息，这里使用了国际化占位符 __MSG_description__，用于在不同语言环境下显示对应的插件说明
+	"version": "1.6.7", // 插件的版本号，当前为 1.6.7
+	"incognito": "split",// 无痕模式支持策略，split 表示插件在无痕模式和普通模式下分别独立运行，互不共享数据
+	"manifest_version": 3, // 使用的是 Manifest V3 版本，这是 Chrome 扩展的最新版本规范
+	"icons": {// 定义插件的图标，用于在浏览器扩展管理页面、工具栏提示等地方显示
+    	"64": "images/icon.png",// 当需要 64x64 像素大小的图标时，使用 images/icon.png 这张图片
+    	"128": "images/icon128.png"// 当需要 128x128 像素大小的图标时，使用 images/icon128.png 这张图片
+  	},
+	"content_scripts": [// 定义内容脚本（即在网页中运行的 JavaScript 脚本）
+    {
+      "matches": [// 指定该内容脚本在哪些网页上运行
+        "https://*/*", // 所有 HTTPS 协议的网页
+        "http://*/*"// 所有 HTTP 协议的网页
+      ],
+      "js": [ // 要注入的 JavaScript 文件
+        "script/content-script.js"// 具体文件路径为 script/content-script.js
+      ],
+      "run_at": "document_start",// 脚本在文档开始加载阶段就注入并执行，早于页面 DOM 构建
+      "all_frames": true // 脚本会在该网页中的所有框架（iframe）内也注入运行，而不仅限于顶层页面
+    }
+
+  ],
+	"background": {
+     "service_worker": "script/background.js"
+  }
+}
