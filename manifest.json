@@ -22,7 +22,10 @@
     }
 
   ],
-	"background": {
+  "background": { // 声明扩展使用 script/background.js作为后台 Service Worker，负责处理后台逻辑，比如事件监听、消息通信等
      "service_worker": "script/background.js"
-  }
+  },
+  "permissions": [ // 申请使用 Chrome 的 webNavigationAPI，用于监听页面跳转、路由变化等导航事件
+    "webNavigation"
+  ]
 }
