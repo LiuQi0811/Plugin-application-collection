@@ -1,5 +1,5 @@
 {
-	"name": "__MSG_Plugin_", // 插件的名称，这里使用了国际化占位符 __MSG_Plugin_，实际名称会在 _locales 目录下的语言文件中定义
+	"name": "__MSG_Plugin__", // 插件的名称，这里使用了国际化占位符 __MSG_Plugin_，实际名称会在 _locales 目录下的语言文件中定义
 	"description": "__MSG_description__", // 插件的描述信息，这里使用了国际化占位符 __MSG_description__，用于在不同语言环境下显示对应的插件说明
 	"version": "1.6.7", // 插件的版本号，当前为 1.6.7
 	"incognito": "split",// 无痕模式支持策略，split 表示插件在无痕模式和普通模式下分别独立运行，互不共享数据
@@ -8,6 +8,11 @@
     	"64": "images/icon.png",// 当需要 64x64 像素大小的图标时，使用 images/icon.png 这张图片
     	"128": "images/icon128.png"// 当需要 128x128 像素大小的图标时，使用 images/icon128.png 这张图片
   	},
+  "action": {
+      "default_icon": "images/icon.png",
+      "default_title": "__MSG_Plugin__",
+      "default_popup": "popup.html"
+  },
 	"content_scripts": [// 定义内容脚本（即在网页中运行的 JavaScript 脚本）
     {
       "matches": [// 指定该内容脚本在哪些网页上运行
@@ -25,7 +30,24 @@
   "background": { // 声明扩展使用 script/background.js作为后台 Service Worker，负责处理后台逻辑，比如事件监听、消息通信等
      "service_worker": "script/background.js"
   },
-  "permissions": [ // 申请使用 Chrome 的 webNavigationAPI，用于监听页面跳转、路由变化等导航事件
-    "webNavigation"
+  "permissions": [
+    "webNavigation",// 申请使用 Chrome 的 webNavigationAPI，用于监听页面跳转、路由变化等导航事件
+    "alarms", // 允许使用 alarms API，可以设置定时任务（比如定时触发某些功能）
+    "webRequest", // 允许使用 webRequest API，可以监听、拦截或修改浏览器的网络请求
+    "declarativeNetRequest" // 允许使用 declarativeNetRequest API，以声明式的方式拦截和修改网络请求（无需后台脚本持续运行）
+  ],
+  "host_permissions": [
+    "*://*/*", // 允许扩展访问所有协议（如 http、https 等）下的任意域名与路径的网页资源
+    "<all_urls>" // 同样表示允许访问所有网址（等同于 *://*/*），是更通用的写法
+  ],
+   "web_accessible_resources": [
+    {
+      "resources": [// 定义哪些资源可以被网页访问（通常是扩展提供的脚本或文件）
+        "catch-script/*" // 表示 catch-script 文件夹下的所有资源可以被网页访问
+      ],
+      "matches": [
+        "<all_urls>"// 表示这些资源可以被所有网站（<all_urls>）通过 URL 访问到
+      ]
+    }
   ]
 }
