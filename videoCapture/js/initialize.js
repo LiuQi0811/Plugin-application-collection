@@ -266,7 +266,7 @@ function InitializeOptions() {
         // 标记：本地配置初始化完成
         G.initializeLocalComplete = true;
     });
-};
+}
 
 /**
  * chrome.runtime.onInstalled 监听 Chrome 扩展的安装和更新事件（扩展升级，清空本地储存）

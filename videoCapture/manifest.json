@@ -1,16 +1,17 @@
 {
-	"name": "__MSG_Plugin__", // 插件的名称，这里使用了国际化占位符 __MSG_Plugin_，实际名称会在 _locales 目录下的语言文件中定义
+	"name": "__MSG_videoCatch__", // 插件的名称，这里使用了国际化占位符 __MSG_Plugin_，实际名称会在 _locales 目录下的语言文件中定义
 	"description": "__MSG_description__", // 插件的描述信息，这里使用了国际化占位符 __MSG_description__，用于在不同语言环境下显示对应的插件说明
 	"version": "1.6.7", // 插件的版本号，当前为 1.6.7
 	"incognito": "split",// 无痕模式支持策略，split 表示插件在无痕模式和普通模式下分别独立运行，互不共享数据
 	"manifest_version": 3, // 使用的是 Manifest V3 版本，这是 Chrome 扩展的最新版本规范
+  "default_locale": "en",
 	"icons": {// 定义插件的图标，用于在浏览器扩展管理页面、工具栏提示等地方显示
     	"64": "images/icon.png",// 当需要 64x64 像素大小的图标时，使用 images/icon.png 这张图片
     	"128": "images/icon128.png"// 当需要 128x128 像素大小的图标时，使用 images/icon128.png 这张图片
   	},
   "action": {
       "default_icon": "images/icon.png",
-      "default_title": "__MSG_Plugin__",
+      "default_title": "__MSG_videoCatch__",
       "default_popup": "popup.html"
   },
 	"content_scripts": [// 定义内容脚本（即在网页中运行的 JavaScript 脚本）
@@ -34,7 +35,10 @@
     "webNavigation",// 申请使用 Chrome 的 webNavigationAPI，用于监听页面跳转、路由变化等导航事件
     "alarms", // 允许使用 alarms API，可以设置定时任务（比如定时触发某些功能）
     "webRequest", // 允许使用 webRequest API，可以监听、拦截或修改浏览器的网络请求
-    "declarativeNetRequest" // 允许使用 declarativeNetRequest API，以声明式的方式拦截和修改网络请求（无需后台脚本持续运行）
+    "declarativeNetRequest", // 允许使用 declarativeNetRequest API，以声明式的方式拦截和修改网络请求（无需后台脚本持续运行）
+    "downloads", // 允许使用 downloads API，可以控制下载行为，比如启动下载、获取下载状态等
+    "sidePanel", // 允许使用 sidePanel API，用于控制和管理 Chrome 扩展的侧边栏界面（Chrome 114+）
+    "storage" // 允许使用 storage API，用于读写扩展的本地或同步存储数据（如用户配置、缓存等）
   ],
   "host_permissions": [
     "*://*/*", // 允许扩展访问所有协议（如 http、https 等）下的任意域名与路径的网页资源
