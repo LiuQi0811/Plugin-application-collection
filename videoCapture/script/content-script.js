@@ -7,7 +7,7 @@
      * @author LiuQi
      */
     chrome.runtime.onMessage.addListener(function (Message, sender, sendResponse) {
-        window.alert("message?: DOMString");
+        console.log(" // TODO content-script.js chrome.runtime.onMessage .......");
     });
 
     /**
@@ -16,10 +16,9 @@
      * @author LiuQi
      */
     window.addEventListener("message", (event) => {
+        console.log(" // TODO content-script.js  window.addEventListener ");
         if (!event.data || !event.data.action) return;
-        console.log(" Action ", event.data.action);
-        console.error("Event -- ", event.data, " =======   ", event.data.action);
-    });
+    }, false);
 
     // 声明一个变量 Port，用于保存与 background script 或其他部分建立的通信端口
     let Port;
