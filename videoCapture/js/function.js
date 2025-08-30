@@ -216,7 +216,10 @@ function dataStorage(tabId) {
 function setExtensionIcon(data) {
     // 如果 number 为 0 或 undefined，表示没有需要显示的内容
     if (data?.number == 0 || data?.number == undefined) {
-        console.log("  // TODO  setExtensionIcon Method  if(data?.number == 0 || data?.number == undefined) ");
+        chrome.action.setBadgeText({text: "", tabId: data?.tabId ?? G.tabId}, function () {
+            // 如果设置过程中出现错误（通过 chrome.runtime.lastError 判断），当前仅静默处理
+            if (chrome.runtime.lastError) return;
+        });
     }
     // 如果全局配置 G.badgeNumber 为真，表示启用徽章功能
     else if (G.badgeNumber) {
@@ -228,4 +231,293 @@ function setExtensionIcon(data) {
             if (chrome.runtime.lastError) return;
         });
     }
+}
+
+/**
+ * clearRedundant 清理冗余数据
+ * 根据当前存在的标签页ID，清理缓存、URL映射、脚本列表、网络规则等无效数据
+ * @author LiuQi
+ */
+function clearRedundant() {
+    // 查询所有标签页，获取当前存在的标签页ID集合
+    chrome.tabs.query({}, function (tabs) {
+        // 当前所有标签页ID的Set集合
+        const allTabId = new Set(tabs.map(tab => tab.id));
+        // 清理缓存数据（若未初始化）
+        if (!cacheData.initialize) {
+            // 标记是否需要更新缓存
+            let cacheDataFlag = false;
+            for (let key in cacheData) {
+                // 删除不存在标签页对应的缓存数据
+                if (!allTabId.has(Number(key))) {
+                    cacheDataFlag = true;
+                    delete cacheData[key];
+                }
+            }
+            // 若缓存有变动，更新存储（优先使用session存储，否则用local）
+            cacheDataFlag && (chrome.storage.session ?? chrome.storage.local).set({MediaData: cacheData});
+        }
+        // 清理URL映射表（G.urlMap）
+        G.urlMap.forEach((_, key) => {
+            // 删除不存在的标签页ID对应的URL记录
+            !allTabId.has(key) && G.urlMap.delete(key);
+        });
+        // 清理脚本列表（G.scriptList）
+        G.scriptList.forEach(function (scriptList) {
+            scriptList.tabId.forEach(function (tabId) {
+                if (!allTabId.has(tabId)) {
+                    // 删除无效标签页关联的脚本ID
+                    scriptList.tabId.delete(tabId);
+                }
+            });
+        });
+        // 若本地初始化未完成，直接返回
+        if (!G.initializeLocalComplete) return;
+        // 清理declarativeNetRequest规则（模拟手机请求头等）
+        chrome.declarativeNetRequest.getSessionRules(function (rules) {
+            // 标记是否需要更新移动端规则
+            let mobileFlag = false;
+            for (let rule of rules) {
+                if (rule.condition.tabIds) {
+                    // 若规则关联的标签页已全部关闭，则删除该规则
+                    if (!rule.condition.tabIds.some(id => allTabId.has(id))) {
+                        mobileFlag = true;
+                        // 同步删除内存中的标签页ID
+                        rule.condition.tabIds.forEach(id => G.featMobileTabId.delete(id));
+                        chrome.declarativeNetRequest.updateSessionRules({
+                            // 移除无效规则
+                            removeRuleIds: [rule.id]
+                        });
+                    }
+                } else if (rule.id == 1) {
+                    // 特殊处理：清理预览视频时添加的请求头规则
+                    chrome.declarativeNetRequest.updateSessionRules({removeRuleIds: [1]});
+                }
+            }
+            // 更新移动端规则相关的存储
+            mobileFlag && (chrome.storage.session ?? chrome.storage.local).set({featMobileTabId: Array.from(G.featMobileTabId)});
+        });
+
+        // 清理自动下载任务（G.featAutoDownTabId）
+        let autoDownFlag = false;
+        G.featAutoDownTabId.forEach(function (tabId) {
+            if (!allTabId.has(tabId)) {
+                autoDownFlag = true;
+                // 删除无效的自动下载标签页ID
+                G.featAutoDownTabId.delete(tabId);
+            }
+        });
+        autoDownFlag && (chrome.storage.session ?? chrome.storage.local).set({featAutoDownTabId: Array.from(G.featAutoDownTabId)});
+        // 清理其他冗余数据
+        G.blockUrlSet = new Set([...G.blockUrlSet]
+            // 过滤无效的屏蔽URL记录
+            .filter(R => allTabId.has(R)));
+        if (G.requestHeaders.size >= 10240) {
+            // 请求头数据过大时清空（防止内存溢出）
+            G.requestHeaders.clear();
+        }
+    });
+}
+
+/**
+ * stringModify 替换文件名（含路径）中的特殊字符，确保文件路径的合规性和安全性
+ * @param {string} str - 待处理的原始字符串（可能包含路径和文件名）
+ * @param {string} text - 可选参数，用于自定义过滤逻辑（当前未直接使用）
+ * @returns {string} - 处理后的字符串，特殊字符被替换为HTML实体或移除
+ * @author LiuQi
+ */
+function stringModify(str, text) {
+    // 若输入为空，直接返回原字符串
+    if (!str) return str;
+    // 调用filterFileName函数过滤文件名中的非法字符
+    str = filterFileName(str, text);
+    // 替换路径分隔符为HTML实体，避免路径解析冲突或安全风险
+    return str
+        .replaceAll("\\", "&bsol;") // 将反斜杠（\）替换为HTML实体 &bsol;
+        .replaceAll("/", "&sol;");  // 将正斜杠（/）替换为HTML实体 &sol;
+}
+
+/**
+ * filterFileName 过滤文件名中的非法字符和特殊Unicode字符，确保文件名符合系统规范
+ * @param {string} str - 待处理的原始文件名（可能包含路径或特殊字符）
+ * @param {string} text - 预留参数，当前未直接使用（可用于扩展过滤规则）
+ * @returns {string} - 处理后的安全文件名，移除非法字符并修复末尾点号问题
+ * @author LiuQi
+ */
+function filterFileName(str, text) {
+    // 若输入为空，直接返回原字符串
+    if (!str) return str;
+    // 重置正则表达式的匹配索引，避免上次匹配影响本次结果
+    reFilterFileName.lastIndex = 0;
+    // 移除Unicode控制字符（零宽空格、零宽非连接符等）
+    str = str.replaceAll(/\u200B/g, "") // 移除零宽空格（U+200B）
+        .replaceAll(/\u200C/g, "") // 移除零宽非连接符（U+200C）
+        .replaceAll(/\u200D/g, ""); // 移除零宽连接符（U+200D）
+    // 使用预定义的正则表达式（reFilterFileName）匹配非法字符，并记录匹配项（调试用）
+    str.replace(reFilterFileName, function (match) {
+        // 调试日志：输出非法字符匹配项
+        console.log("// TODO function.js filterFileName by MATCH ", match)
+    });
+    // 如果最后一位是"." chrome.download 无法下载/处理文件名以点号结尾的情况（Chrome下载限制）
+    if (str.endsWith(".")) {
+        // 追加字符串避免下载失败（如将"file."改为"file.videoCapture"）
+        str = str + "videoCapture";
+    }
+    return str;
+}
+
+/**
+ * isEmpty 判断给定值是否为空（支持检测 undefined、null、空字符串及纯空格字符串）
+ * @param {Object} data - 待检测的值，可以是任意类型（如字符串、对象、数组等）
+ * @returns {boolean} - 若值为空（满足任一条件）则返回 true，否则返回 false
+ * @author LiuQi
+ */
+function isEmpty(data) {
+    return (typeof data == "undefined" || // 检测未定义的变量
+        data == null || // 检测 null 或 undefined（双等号匹配两者）
+        data == "" ||  // 检测空字符串
+        data == " "); // 检测仅含一个空格的字符串
+}
+
+/**
+ * templates 模板替换函数：根据数据对象动态替换文本中的占位符（支持URL解析生成文件名）
+ * @param {string} text - 包含占位符的模板字符串（如"文件名：{{fullFileName}}"）
+ * @param {Object} data - 包含替换数据的对象，需至少包含 `url` 属性（用于解析文件名）
+ * @returns {string} - 替换后的字符串
+ * @author LiuQi
+ */
+function templates(text, data) {
+    // 若输入文本为空，直接返回空字符串
+    if (isEmpty(text)) return "";
+    try {
+        // 从URL路径中提取文件名并存入data对象
+        data.fullFileName = new URL(data.url)
+            .pathname // 获取路径部分（如"/path/to/file.txt"）
+            .split("/")  // 按斜杠分割路径
+            .pop();  // 取最后一段作为文件名（如"file.txt"）
+    } catch (e) {
+        // URL解析失败时设置默认值
+        data.fullFileName = "NULL";
+    }
+    // 调试日志：输出待替换的数据对象
+    console.log(" // TODO templates 模板替换 ", data);
+}
+
+/**
+ * byteToSize 字节转换成大小 将字节数转换为易读的大小单位（KB/MB/GB），自动根据数值范围选择合适的单位
+ * @param {number} byte - 待转换的字节数（必须为非负数）
+ * @returns {string|number} - 格式化后的字符串（如 "1.5MB"）或 0（输入无效时）
+ * @author LiuQi
+ */
+function byteToSize(byte) {
+    // 输入校验：若输入无效（空值、非数字或小于1024字节），直接返回0
+    if (!byte || byte < 1024) return 0;
+    // 分级转换逻辑
+    if (byte < 1024 * 1024) { // 转换为KB（范围：1024B ~ 1MB）
+        // 保留1位小数（如 "256.0KB"）
+        return (byte / 1024).toFixed(1) + "KB";
+    } else if (byte < 1024 * 1024 * 1024) { // 转换为MB（范围：1MB ~ 1GB）
+        // 保留1位小数（如 "3.5MB"）
+        return (byte / 1024 / 1024).toFixed(1) + "MB";
+    } else { // 转换为GB（范围：≥1GB）
+        // 保留1位小数（如 "1.2GB"）
+        return (byte / 1024 / 1024 / 1024).toFixed(1) + "GB";
+    }
+}
+
+/**
+ * isM3U8 判断输入数据是否为 M3U8 格式的播放列表（支持文件扩展名和 MIME 类型检测）
+ * @param {Object} data - 待检测的数据对象，需包含 `ext`（扩展名）或 `type`（MIME 类型）属性
+ * @returns {boolean} - 若数据符合 M3U8 格式特征则返回 true，否则返回 false
+ * @author LiuQi
+ */
+function isM3U8(data) {
+    return (
+        data.ext == "m3u8" ||  // 检测扩展名是否为 m3u8（HLS 标准格式）
+        data.ext == "m3u" || // 检测扩展名是否为 m3u（旧版格式）
+        data.type?.endsWith("/vnd.apple.mpegurl") || // 检测 MIME 类型是否为苹果 HLS 标准类型
+        data.type?.endsWith("/x-mpegurl") || // 检测旧版 MIME 类型（部分服务使用）
+        data.type?.endsWith("/mpegurl") ||  // 检测通用 MIME 类型
+        data.type?.endsWith("/octet-stream-m3u8")); // 检测自定义 MIME 类型（部分加密场景使用）
+}
+
+/**
+ * isMPD 判断输入数据是否为 MPEG-DASH 格式的媒体描述文件（MPD）
+ * @param {Object} data - 待检测的数据对象，需包含 `ext`（文件扩展名）或 `type`（MIME 类型）属性
+ * @returns {boolean} - 若数据符合 MPD 文件特征（扩展名为 `.mpd` 或 MIME 类型为 `application/dash+xml`）则返回 true，否则返回 false
+ * @author LiuQi
+ */
+function isMPD(data) {
+    return (data.ext == "mpd" ||  // 检测文件扩展名是否为 .mpd（标准MPD文件后缀）
+        data.type == "application/dash+xml" // 检测 MIME 类型是否为 DASH 协议标准类型
+    )
+}
+
+/**
+ * isJSON 判断输入数据是否为 JSON 格式（通过文件扩展名或 MIME 类型检测）
+ * @param {Object} data - 待检测的数据对象，需包含 `ext`（文件扩展名）或 `type`（MIME 类型）属性
+ * @returns {boolean} - 若数据符合 JSON 格式特征（扩展名为 `.json` 或 MIME 类型为 `application/json`/`text/json`）则返回 true，否则返回 false
+ * @author LiuQi
+ */
+function isJSON(data) {
+    return (data.ext == "json" || // 检测文件扩展名是否为 .json（标准JSON文件后缀）
+        data.type == "application/json" || // 检测 MIME 类型是否为标准 JSON 类型（RFC 4627）
+        data.type == "text/json"  // 检测旧版或非标准 MIME 类型（部分服务使用）
+    )
+}
+
+/**
+ * isPlay 判断输入数据是否为可播放的媒体资源（支持扩展名、MIME类型及HLS流检测）
+ * @param {Object} data - 待检测的数据对象，需包含 `ext`（文件扩展名）或 `type`（MIME类型）属性
+ * @returns {boolean} - 若数据符合可播放的媒体特征则返回 true，否则返回 false
+ * @author LiuQi
+ */
+function isPlay(data) {
+    // 优先检查全局播放器实例（G.player）是否存在，且数据非JSON/图片
+    if (G.player && !isJSON(data) && !isPicture(data)) return true;
+    // 定义支持的音视频MIME类型列表（覆盖常见格式）
+    const typeArray = [
+        "video/ogg", "video/mp4", "video/webm",  // 视频格式
+        "audio/ogg", "audio/mp3", "audio/wav", // 音频格式
+        "audio/m4a", "video/3gp", "video/mpeg", // 移动端兼容格式
+        "video/mov" // QuickTime格式
+    ];
+    // 综合判断条件
+    // - 扩展名通过媒体格式检测（isMediaExt）
+    // - MIME类型在支持列表中（typeArray.includes）
+    // - 数据为M3U8流媒体格式（isM3U8）
+    return isMediaExt(data.ext)
+        || typeArray.includes(data.type)
+        || isM3U8(data);
+}
+
+/**
+ * isPicture  判断当前数据是否为图片类型（通过MIME类型或文件扩展名检测）
+ * @param {Object} data - 待检测的数据对象，需包含 `type`（MIME类型）或 `ext`（文件扩展名）属性
+ * @returns {boolean} - 若数据符合图片类型则返回 `true`，否则返回 `false`
+ * @author LiuQi
+ */
+function isPicture(data) {
+    // 检测逻辑优先级：先检查MIME类型（如 "image/jpeg"），再匹配扩展名（如 "jpg"）
+    return (data.type?.startsWith("image/") || // 匹配所有MIME类型以 "image/" 开头的数据
+        data.ext == "jpg" ||  // JPEG格式
+        data.ext == "png" ||  // PNG格式
+        data.ext == "jpeg" || // 另一种JPEG扩展名
+        data.ext == "bmp" ||  // 位图格式
+        data.ext == "gif" ||  // GIF动图或静态图
+        data.ext == "webp" || // WebP格式
+        data.ext == "svg" // 矢量图格式
+    )
+}
+
+/**
+ * isMediaExt 判断文件扩展名是否属于常见的媒体格式
+ * @param {string} ext - 文件扩展名（不包含点，如 "mp4"）
+ * @returns {boolean} - 如果扩展名是支持的媒体格式则返回 true，否则返回 false
+ * @author LiuQi
+ */
+function isMediaExt(ext) {
+    // 支持的媒体格式列表，涵盖主流音视频容器和编码格式
+    return ["ogg", "ogv", "mp4", "webm", "mp3", "wav", "m4a", "3gp", "mpeg", "mov", "m4s", "aac"]
+        .includes(ext);
 }
