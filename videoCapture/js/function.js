@@ -97,6 +97,68 @@ function getRequestHeaders(data) {
 }
 
 /**
+ * setRequestHeaders 设置网络请求头（通过 Chrome 的 declarativeNetRequest API 动态添加请求头修改规则）
+ * 主要用于给 XMLHttpRequest、图片、媒体等类型的请求动态添加/修改 HTTP 请求头
+ * @param {Object} data - 需要设置的请求头对象，格式如：{ 'X-My-Header': 'value' }
+ * @param {Function} [callback] - 可选的回调函数，在规则更新完成后被调用
+ * @author LiuQi
+ */
+function setRequestHeaders(data = {}, callback = undefined) {
+    // 移除之前可能已经添加的 session rule，ruleId 为 1，避免重复或冲突
+    chrome.declarativeNetRequest.updateSessionRules({removeRuleIds: [1]});
+    // 尝试获取当前正在显示的标签页（通常是用户正在浏览的那个页面）
+    chrome.tabs.getCurrent(function (tabs) {
+        // 初始化规则配置对象，准备先移除一些规则
+        // 如果获取到了当前标签页（tabs），则移除该标签页 ID 对应的规则；否则移除 ruleId 为 1 的规则
+        const rules = {removeRuleIds: [tabs ? tabs.id : 1]};
+        // 如果传入的 data 对象中有数据（即用户设置了需要修改的请求头）
+        if (Object.keys(data).length) {
+            // 构造要添加的新规则，作用是修改特定类型请求的请求头
+            rules.addRules = [{
+                "id": tabs ? tabs.id : 1, // 规则的唯一标识 ID，优先使用标签页 ID，否则用 1
+                "priority": tabs ? tabs.id : 1, // 规则的优先级，同样优先使用标签页 ID
+                "action": {
+                    "type": "modifyHeaders",  // 动作类型：修改请求头
+                    "requestHeaders": Object.keys(data) // 遍历 data 的所有键（即请求头字段名）
+                        .map(key => ({
+                            header: key, // 请求头字段，如 'X-Custom-Header'
+                            operation: "set",  // 操作：设置为某个值
+                            value: data[key] // 值，如 'my-value'
+                        }))
+                },
+                "condition": {
+                    "resourceTypes": ["xmlhttprequest", "media", "image"] // 仅对这几种资源类型的请求生效
+                }
+            }];
+            if (tabs) {
+                // 如果是在某个具体的标签页上下文中（比如插件按钮点击时在某个网页内触发）
+                console.log(" // TODO function.js TABS")
+            } else {
+                // 如果不是在具体标签页中（比如在后台脚本、弹窗、options 页等调用）
+                // 检查当前浏览器是否支持 initiatorDomains 字段
+                // initiatorDomains 只支持 chrome 101+ firefox 113+  Chrome 101 之前 和 Firefox 113 之前 不支持该字段
+                if (G.version < 101 || (G.isFirefox && G.version < 113)) {
+                    // 如果浏览器版本太低，不支持 initiatorDomains，则直接调用回调，不添加新规则
+                    callback && callback();
+                }
+                // 确定该规则适用于哪些“发起者”（即哪个扩展或网页发起的请求）
+                // 如果是 Firefox，使用扩展的 hostname；如果是 Chrome，使用扩展的 ID
+                const domain = G.isFirefox
+                    ? new URL(chrome.runtime.getURL("")).hostname // Firefox 下获取扩展的域名
+                    : chrome.runtime.id; // Chrome 下使用扩展 ID
+                // 将该 domain 添加到规则的匹配条件中，表示只有从这个 domain 发起的请求才会应用此规则
+                rules.addRules[0].condition.initiatorDomains = [domain];
+            }
+        }
+        // 应用规则：先移除旧规则，再添加新规则
+        chrome.declarativeNetRequest.updateSessionRules(rules, function () {
+            // 规则更新完成后，如果用户传入了回调函数，则调用它
+            callback && callback();
+        });
+    });
+}
+
+/**
  * getResponseHeadersValue  从响应头数据中提取特定的常用响应头字段，并解析成更易用的格式
  * @param {Object} data - 包含响应头信息的对象，期望其中有一个字段 responseHeaders，值为响应头数组
  * @returns {Object} 返回一个对象，包含从响应头中提取的以下字段（如果存在）：
