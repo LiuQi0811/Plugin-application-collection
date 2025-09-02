@@ -62,7 +62,14 @@ chrome.runtime.onConnect.addListener(function (Port) {
  * @author LiuQi
  */
 chrome.alarms.onAlarm.addListener(function (alarm) {
-    console.log(" // TODO background.js chrome.alarms.onAlarm ", alarm);
+    if(alarm.name === "nowClear" || alarm.name === "clear"){
+        // 清理冗余数据
+        clearRedundant();
+    }
+    if(alarm.name === "save" ){
+        console.log(" // TODO background.js if (alarm.name === 'save') ");
+    }
+    
 });
 
 /**
@@ -137,51 +144,194 @@ chrome.webRequest.onErrorOccurred.addListener(function(details){ // 回调函数
 {urls: ["<all_urls>"]});
 
 /**
- * onMessage 
+ * onMessage 监听 扩展 message 事件
  * @author LiuQi
  */
-chrome.runtime.onMessage.addListener(function(){
-    console.log(" // TODO background.js chrome.runtime.onMessage ... ");
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse){
+    if(chrome.runtime.lastError) return;
+    if(!G.initializeLocalComplete || !G.initializeSyncComplete){
+        console.log("TODO background.js chrome.runtime.onMessage if(!G.initializeLocalComplete || !G.initializeSyncComplete) .....")
+    }
+    // 以下检查是否有 tabId 不存在使用当前标签
+    message.tabId = message.tabId ?? G.tabId;
+    // 从缓存中保存数据到本地
+    if(message.Message == "pushData"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'pushData') ... ");
+    }
+    // 获取所有数据
+    if(message.Message == "getAllData"){
+      sendResponse(cacheData);
+      return true;
+    }
+    /**
+     * 设置扩展图标数字
+     * 提供 type 删除标签为 tabId 的数字
+     * 不提供type 删除所有标签的数字
+     */
+    if(message.Message == "clearIcon"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'clearIcon')  ... ");
+    }
+    // 启用/禁用扩展
+    if(message.Message == "enable"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'enable')  ... ");
+    }
+    // 提供requestId数组 获取指定的数据
+    if (message.Message == "getData" && message.requestId) {
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'getData' && message.requestId)  ... ");
+    }
+    // 提供 tabId 获取该标签数据
+    if (message.Message == "getData") {
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'getData') ... ");
+    }
+    // 获取各按钮状态
+    // 模拟手机 自动下载 启用 以及各种脚本状态
+    if(message.Message == "getButtonState"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'getButtonState') ... ");
+    }
+    // 对tabId的标签 进行模拟手机操作
+    if(message.Message == "mobileUserAgent"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'mobileUserAgent') ... ");
+    }
+    // 对tabId的标签 开启 关闭 自动下载
+    if(message.Message == "autoDown"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'autoDown') ... ");
+    }
+    // 对tabId的标签 脚本注入或删除
+    if(message.Message == "script"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'script') ... ");
+    }
+    // 脚本注入 脚本申请多语言文件
+    if(message.Message == "scriptI18n"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'scriptI18n') ... ");
+    }
+    // Heart Beat
+    if(message.Message == "HeartBeat"){
+        chrome.tabs.query({ active: true, currentWindow: true },function (tabs){
+            if(tabs[0] && tabs[0].id){
+                G.tabId = tabs[0].id;
+            }
+        });
+        sendResponse("HeartBeat OK");
+        return true;
+    }
+    // 清理数据
+    if (message.Message == "clearData"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'clearData') ... ");
+    }
+    // 清理冗余数据
+    if(message.Message == "clearRedundant"){
+        clearRedundant();
+        sendResponse("OK");
+        return true;
+    }
+    // 从 content-script 或 capture-script 传来的媒体url
+    if(message.Message == "addMedia"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'addMedia') ... ");
+    }
+    // ffmpeg网页通信
+    if(message.Message == "captureFFmpeg"){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'captureFFmpeg') ... ");
+    }
+    // 发送数据到本地
+    if(message.Message == "send2local" && G.send2local){
+        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'send2local'&& G.send2local) ... ");
+    }
 });
 
 /** 
- * onActivated
+ * onActivated 监听浏览器标签页激活事件，更新全局标签页ID并同步扩展图标状态
+ * @param {Object} activeInfo - Chrome API提供的标签页激活信息对象，包含：
+ * - tabId {number} 当前被激活标签页的唯一标识符
+ * - windowId {number} 标签页所属窗口的唯一标识符
  * @author LiuQi
  */
-chrome.tabs.onActivated.addListener(function(){
-    console.log(" // TODO background.js chrome.tabs.onActivated ... ");
+chrome.tabs.onActivated.addListener(function(activeInfo){
+    // 更新全局当前标签页ID
+    G.tabId = activeInfo.tabId;
+    // 检查当前标签页是否有缓存数据
+    if(cacheData[G.tabId] !== undefined){
+        // 存在缓存数据：更新图标徽章，显示数据条数
+        setExtensionIcon({number: cacheData[G.tabId].length, tabId: G.tabId});
+        return;
+    }
+    // 无缓存数据：清除图标徽章
+    setExtensionIcon({tabId: G.tabId});
 });
 
 /** 
- * onRemoved
+ * onRemoved 监听 标签关闭清理数据
  * @author LiuQi
  */
-chrome.tabs.onRemoved.addListener(function(){
-    console.log(" // TODO background.js chrome.tabs.onRemoved ... ");
+chrome.tabs.onRemoved.addListener(function(tabId){
+    // 清理缓存数据
+    chrome.alarms.get("nowClear", function(alarm){
+         !alarm && chrome.alarms.create("nowClear", { when: Date.now() + 1000 });
+         if(G.initializeSyncComplete){
+            G.blockUrlSet.has(tabId) && G.blockUrlSet.delete(tabId);
+         }
+    });
 });
 
 /** 
  * onUpdated
  * @author LiuQi
  */
-chrome.tabs.onUpdated.addListener(function(){
-    console.log(" // TODO background.js chrome.tabs.onUpdated ... ");
+chrome.tabs.onUpdated.addListener(function(tabId,changeInfo,tab){
+    if(isSpecialPage(tab.url) || tabId <= 0 || !G.initializeSyncComplete) return;
+    if (changeInfo.status && changeInfo.status == "loading" && G.autoClearMode == 2){
+        console.log(" // TODO background.js if (changeInfo.status && changeInfo.status == 'loading' && G.autoClearMode == 2) ... ");
+    }
+    if(changeInfo.url && tabId > 0 && G.blockUrl.length){
+        console/log(" // TODO if(changeInfo.url && tabId > 0 && G.blockUrl.length) ....");
+    }
+    chrome.sidePanel.setOptions({
+        tabId,
+        path: "popup.html?tabId=" + tabId
+    });
 });
 
 /** 
- * onCommitted
+ * onCommitted 监听 frame 正在载入 
+ * 检查 是否在屏蔽列表中 (frameId == 0 为主框架) 
+ * 检查 自动清理 (frameId == 0 为主框架) 
+ * 检查 注入脚本
  * @author LiuQi
  */
-chrome.webNavigation.onCommitted.addListener(function(){
-    console.log(" // TODO background.js chrome.webNavigation.onCommitted ... ");
+chrome.webNavigation.onCommitted.addListener(function(details){
+    if(isSpecialPage(details.url) || details.tabId <= 0 || !G.initializeSyncComplete) return;
+    // 刷新页面 检查是否在屏蔽列表中
+    if(details.frameId == 0 && details.transitionType == "reload"){
+        G.blockUrlSet.delete(details.tabId);
+        if(isLockUrl(details.url)){
+             console.log(" // TODO background,js onCommitted 监听 frame 正在载入  if(isLockUrl(details.url)) ..... " );
+        }
+    }
+    // 刷新清理角标数
+    if (details.frameId == 0 && (!["auto_subframe", "manual_subframe", "form_submit"].includes(details.transitionType)) && G.autoClearMode == 1){
+        delete cacheData[details.tabId];
+        G.urlMap.delete(details.tabId);
+        (chrome.storage.session ?? chrome.storage.local).set({ MediaData: cacheData });
+        setExtensionIcon({ tabId: details.tabId });
+    }
+    if (G.version < 102) return;
+    if (G.deepSearch && G.deepSearchTemporarilyClose != details.tabId) {
+        console.log(" // TODO if (G.deepSearch && G.deepSearchTemporarilyClose != details.tabId) ...... ");
+    }
+    // capture-script 脚本
+    G.scriptList.forEach(function(item, script){
+        if (!item.tabId.has(details.tabId) || !item.allFrames) return true;
+        console.log(" // TODO background.js capture-script 脚本 ....." ,item , script);
+    });
 });
 
 /** 
- * onCompleted
+ * onCompleted 监听 页面完全加载完成 判断是否在线ffmpeg页面
  * @author LiuQi
  */
-chrome.webNavigation.onCompleted.addListener(function(){
-    console.log(" // TODO background.js chrome.webNavigation.onCompleted ... ");
+chrome.webNavigation.onCompleted.addListener(function(details){
+     if (G.ffmpegConfig.tab && details.tabId == G.ffmpegConfig.tab){
+        console.log(" // TODO background.js chrome.webNavigation.onCompleted ... " ,details);
+     }
 });
 
 /** 
