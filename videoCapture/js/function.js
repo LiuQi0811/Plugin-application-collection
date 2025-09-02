@@ -31,7 +31,7 @@ function wildcardToRegEx(urlPattern) {
  */
 function isSpecialPage(url) {
     // URL 为空、未定义、或者为字符串 "null"（可能是未正确获取到地址，或占位数据）直接返回 true
-    if (!url || url == "null") return true;
+    if (!url || url === "null") return true;
     // 正常的网页链接 返回 false
     return !(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:"));
 }
@@ -72,7 +72,7 @@ function fileNameParse(pathname) {
  */
 function getRequestHeaders(data) {
     // 检查传入的数据中是否存在 allRequestHeaders 字段，并且它是一个非空数组
-    if (data.allRequestHeaders == undefined || data.allRequestHeaders.length == 0) return false;
+    if (data.allRequestHeaders === undefined || data.allRequestHeaders.length === 0) return false;
     // 定义一个空对象，用于存储请求头的字段
     const header = {};
     // 遍历所有的请求头项
@@ -80,13 +80,13 @@ function getRequestHeaders(data) {
         // 统一将请求头名称转为小写，便于后续匹配
         item.name = item.name.toLowerCase();
         // 根据请求头名称，将特定字段的值存入 header 对象中
-        if (item.name == "referer") {
+        if (item.name === "referer") {
             header.referer = item.value;
-        } else if (item.name == "origin") {
+        } else if (item.name === "origin") {
             header.origin = item.value;
-        } else if (item.name == "cookie") {
+        } else if (item.name === "cookie") {
             header.cookie = item.value;
-        } else if (item.name == "authorization") {
+        } else if (item.name === "authorization") {
             header.authorization = item.value;
         }
     }
@@ -171,22 +171,22 @@ function getResponseHeadersValue(data) {
     // 定义一个空对象，用于存储解析后的响应头信息
     const header = {};
     // 如果 responseHeaders 未定义 或 是空数组，直接返回空对象
-    if (data.responseHeaders == undefined || data.responseHeaders.length == 0) return header;
+    if (data.responseHeaders === undefined || data.responseHeaders.length === 0) return header;
     // 遍历每一个响应头项
     for (let item of data.responseHeaders) {
         // 统一将响应头名称转为小写，方便后续匹配
         item.name = item.name.toLowerCase();
         // 根据不同的响应头名称，提取并处理对应的信息
-        if (item.name == "content-length") {
+        if (item.name === "content-length") {
             // Content-Length：内容长度（字节），优先使用此值，但可能被 Content-Range 覆盖
             header.size ??= parseInt(item.value); // 只有当 header.size 未定义时才赋值
-        } else if (item.name == "content-type") {
+        } else if (item.name === "content-type") {
             // Content-Type：提取主 MIME 类型（如 text/html），去掉参数（如 charset=utf-8），并转小写
             header.type = item.value.split(";")[0].toLowerCase();
-        } else if (item.name == "content-disposition") {
+        } else if (item.name === "content-disposition") {
             // Content-Disposition：一般用于标识是否为附件，保留原始值
             header.attachment = item.value;
-        } else if (item.name == "content-range") {
+        } else if (item.name === "content-range") {
             // Content-Range：例如 "bytes 0-999/2000"，其中 2000 是总大小
             // 从 value 中提取总大小部分（索引 1），如果总大小不是 '*'，则解析为数字并作为最终 size
             let size = item.value.split('/')[1];
@@ -218,7 +218,7 @@ function checkExtension(ext, size) {
     if (!result.state) return "break";
     // 如果配置中指定了文件大小限制（result.size != 0），并且传入了 size 参数，且当前文件大小小于等于限制
     // 注意：result.size 单位是 KB，所以要乘以 1024 转为字节再比较
-    if (result.size != 0 && size != undefined && size <= result.size * 1024) return "break";
+    if (result.size !== 0 && size !== undefined && size <= result.size * 1024) return "break";
     // 所有检查通过，返回 true 表示扩展名合法，且未触发限制，允许继续操作
     return true;
 }
@@ -242,7 +242,7 @@ function checkType(type, size) {
     if (!result.state) return "break";
     // 如果配置中指定了文件大小限制（result.size != 0），且传入了 size，且当前文件大小小于等于限制
     // 注意：result.size 单位是 KB，所以要乘以 1024 转为字节再比较
-    if (result.size != 0 && size != undefined && size <= result.size * 1024) return "break";
+    if (result.size !== 0 && size !== undefined && size <= result.size * 1024) return "break";
     // 所有检查通过，返回 true 表示允许继续操作
     return true;
 }
@@ -277,7 +277,7 @@ function dataStorage(tabId) {
  */
 function setExtensionIcon(data) {
     // 如果 number 为 0 或 undefined，表示没有需要显示的内容
-    if (data?.number == 0 || data?.number == undefined) {
+    if (data?.number === 0 || data?.number === undefined) {
         chrome.action.setBadgeText({text: "", tabId: data?.tabId ?? G.tabId}, function () {
             // 如果设置过程中出现错误（通过 chrome.runtime.lastError 判断），当前仅静默处理
             if (chrome.runtime.lastError) return;
@@ -351,7 +351,7 @@ function clearRedundant() {
                             removeRuleIds: [rule.id]
                         });
                     }
-                } else if (rule.id == 1) {
+                } else if (rule.id === 1) {
                     // 特殊处理：清理预览视频时添加的请求头规则
                     chrome.declarativeNetRequest.updateSessionRules({removeRuleIds: [1]});
                 }
@@ -437,8 +437,8 @@ function filterFileName(str, text) {
 function isEmpty(data) {
     return (typeof data == "undefined" || // 检测未定义的变量
         data == null || // 检测 null 或 undefined（双等号匹配两者）
-        data == "" ||  // 检测空字符串
-        data == " "); // 检测仅含一个空格的字符串
+        data === "" ||  // 检测空字符串
+        data === " "); // 检测仅含一个空格的字符串
 }
 
 /**
@@ -495,8 +495,8 @@ function byteToSize(byte) {
  */
 function isM3U8(data) {
     return (
-        data.ext == "m3u8" ||  // 检测扩展名是否为 m3u8（HLS 标准格式）
-        data.ext == "m3u" || // 检测扩展名是否为 m3u（旧版格式）
+        data.ext === "m3u8" ||  // 检测扩展名是否为 m3u8（HLS 标准格式）
+        data.ext === "m3u" || // 检测扩展名是否为 m3u（旧版格式）
         data.type?.endsWith("/vnd.apple.mpegurl") || // 检测 MIME 类型是否为苹果 HLS 标准类型
         data.type?.endsWith("/x-mpegurl") || // 检测旧版 MIME 类型（部分服务使用）
         data.type?.endsWith("/mpegurl") ||  // 检测通用 MIME 类型
@@ -510,8 +510,8 @@ function isM3U8(data) {
  * @author LiuQi
  */
 function isMPD(data) {
-    return (data.ext == "mpd" ||  // 检测文件扩展名是否为 .mpd（标准MPD文件后缀）
-        data.type == "application/dash+xml" // 检测 MIME 类型是否为 DASH 协议标准类型
+    return (data.ext === "mpd" ||  // 检测文件扩展名是否为 .mpd（标准MPD文件后缀）
+        data.type === "application/dash+xml" // 检测 MIME 类型是否为 DASH 协议标准类型
     )
 }
 
@@ -522,9 +522,9 @@ function isMPD(data) {
  * @author LiuQi
  */
 function isJSON(data) {
-    return (data.ext == "json" || // 检测文件扩展名是否为 .json（标准JSON文件后缀）
-        data.type == "application/json" || // 检测 MIME 类型是否为标准 JSON 类型（RFC 4627）
-        data.type == "text/json"  // 检测旧版或非标准 MIME 类型（部分服务使用）
+    return (data.ext === "json" || // 检测文件扩展名是否为 .json（标准JSON文件后缀）
+        data.type === "application/json" || // 检测 MIME 类型是否为标准 JSON 类型（RFC 4627）
+        data.type === "text/json"  // 检测旧版或非标准 MIME 类型（部分服务使用）
     )
 }
 
@@ -562,13 +562,13 @@ function isPlay(data) {
 function isPicture(data) {
     // 检测逻辑优先级：先检查MIME类型（如 "image/jpeg"），再匹配扩展名（如 "jpg"）
     return (data.type?.startsWith("image/") || // 匹配所有MIME类型以 "image/" 开头的数据
-        data.ext == "jpg" ||  // JPEG格式
-        data.ext == "png" ||  // PNG格式
-        data.ext == "jpeg" || // 另一种JPEG扩展名
-        data.ext == "bmp" ||  // 位图格式
-        data.ext == "gif" ||  // GIF动图或静态图
-        data.ext == "webp" || // WebP格式
-        data.ext == "svg" // 矢量图格式
+        data.ext === "jpg" ||  // JPEG格式
+        data.ext === "png" ||  // PNG格式
+        data.ext === "jpeg" || // 另一种JPEG扩展名
+        data.ext === "bmp" ||  // 位图格式
+        data.ext === "gif" ||  // GIF动图或静态图
+        data.ext === "webp" || // WebP格式
+        data.ext === "svg" // 矢量图格式
     )
 }
 
@@ -582,4 +582,30 @@ function isMediaExt(ext) {
     // 支持的媒体格式列表，涵盖主流音视频容器和编码格式
     return ["ogg", "ogv", "mp4", "webm", "mp3", "wav", "m4a", "3gp", "mpeg", "mov", "m4s", "aac"]
         .includes(ext);
+}
+
+/**
+ * seconds2Time 将秒数转换为时分秒格式的字符串，例如：
+ * - 3665 秒 → "1:01:05"（1小时1分5秒）
+ * - 125 秒  → "2:05"  （2分5秒，小时部分不显示）
+ *
+ * @param {number} seconds - 需要转换的秒数（例如：90、3600、3665等）
+ * @returns {string} 格式化后的时间字符串，格式为 "H:MM:SS" 或 "MM:SS"（小时部分可选）
+ * @author LiuQi
+ */
+function seconds2Time(seconds) {
+    // 计算小时数：总秒数除以 3600（1小时=3600秒），然后用位运算 | 0 取整（等同于 Math.floor）
+    let hour = (seconds / 3600) | 0;
+    // 计算剩余秒数后，求分钟数：先取余 3600 得到不足1小时的秒数，再除以 60，取整
+    let min = ((seconds % 3600) / 60) | 0;
+    // 计算剩余的秒数：总秒数 % 60，即除去小时和分钟后剩下的秒数，再取整
+    seconds = (seconds % 60) | 0;
+    // 拼接时间字符串：如果小时数大于 0，显示小时部分，格式如 "1:"；否则小时部分不显示
+    let time = hour > 0 ? hour + ":" : "";
+    // 拼接分钟部分：使用 padStart(2, '0') 保证分钟始终是两位数，如 "02"，然后加 ":"
+    time += min.toString().padStart(2, "0") + ":";
+    // 拼接秒数部分：同样保证是两位数，如 "05"
+    time += seconds.toString().padStart(2, "0");
+    // 返回最终格式的时间字符串，例如 "1:02:05" 或 "02:05"
+    return time;
 }
