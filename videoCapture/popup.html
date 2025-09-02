@@ -1,12 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Document</title>
-	<script src="js/initialize.js"></script>
+    <!-- 声明文档字符编码为 UTF-8，支持中文等 -->
+    <meta charset="UTF-8">
+    <!-- 适配移动端，初始缩放为 1.0，宽度等于设备宽度 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 页面标题，显示在浏览器标签页上，这里是 "VideoCapture" -->
+    <title>VideoCapture</title>
+    <!-- 引入 CSS 样式表 -->
+    <!-- popup.css 弹窗样式 / 页面样式，定义了 tabs、containers、按钮等的布局和外观 动态DOM css-->
+    <link rel="stylesheet" type="text/css" media="all" href="css/popup.css">
+    <!-- communal.css 通用样式，包含一些公共的 class，如 flex、hide、tab-button 等 -->
+    <link rel="stylesheet" type="text/css" media="all" href="css/communal.css">
+    <!-- 引入 JavaScript 文件，在页面加载时执行一些初始化逻辑 -->
+    <!-- initialize.js 用于页面或插件的初始化，比如变量定义、DOM 加载前准备等 -->
+    <script src="js/initialize.js"></script>
+    <!-- function.js 包含一些通用功能函数，比如事件处理、工具方法等 -->
+    <script src="js/function.js"></script>
 </head>
-<body>
-	POPUP .........
+<!-- TODO 页面主体，固定高度 500px 暂时-->
+<body style="height: 500px">
+<!-- 标签页导航栏：用于切换不同功能模块 -->
+<div class="tabs">
+    <div id="current-tab" class="tab-button flex active" title="Current Page">
+        <span data-i18n-outer="currentPage"></span>
+        <div id="quantity"></div>
+    </div>
+    <div id="all-tab" class="tab-button flex" title="Other Pages">
+        <span data-i18n-outer="otherPage"></span>
+        <div id="quantity"></div>
+    </div>
+    <div id="other-tab" class="tab-button">
+        <span data-i18n-outer="otherFeatures"></span> / <span data-i18n-outer="mediaControl"></span>
+    </div>
+    <div id="maybe-key-tab" class="tab-button hide">
+        MAYBE KEY TAB
+    </div>
+</div>
+<!-- 提示信息区域 -->
+<div id="tips">
+    TIPS
+</div>
+<div id="tips-fixed">
+    TIPS FIXED
+</div>
+<!-- 主要内容区域（标签页对应的内容容器，默认隐藏） -->
+<div id="media-list" class="container hide tab-show">
+    MEDIA LIST
+</div>
+<div id="all-media-list" class="container hide">
+    ALL MEDIA LIST
+</div>
+<!-- 其它功能选项，比如设置、高级功能  -->
+<div id="other-options" class="container hide">
+    OTHER OPTIONS
+</div>
+<!-- 预留功能区域，比如密钥、特殊入口 -->
+<div id="maybe-key" class="container hide">
+    MAYBE KEY
+</div>
+<!-- 功能操作区：筛选、功能入口、合并等 -->
+<div id="filter" class="more">
+    FILTER
+    <div id="ext">
+        EXT
+    </div>
+</div>
+<div id="features" class="more flex-end">
+    FEATURES
+</div>
+<div id="down">
+    DOWN
+    <button id="merge-down">
+        MERGE DOWN
+    </button>
+</div>
+<!-- DOM Related JS-->
+<script src="js/popup.js"></script>
+<script src="js/i18n.js"></script>
 </body>
 </html>
