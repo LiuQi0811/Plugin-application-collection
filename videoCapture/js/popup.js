@@ -389,11 +389,62 @@ tabButtons.forEach(function (button, index) {
     });
 });
 
+// 等待 G 全局变量加载完整的操作
+// 使用 setInterval 轮询检查
+const interval = setInterval(function () {
+    // 如果 G 的同步初始化、本地初始化未完成，或者当前 tabId 还未获取到，则跳过本轮，继续等待
+    if (!G.initializeSyncComplete || !G.initializeLocalComplete || !G.tabId) return;
+    // 一旦条件满足，清除轮询定时器，不再继续检查
+    clearInterval(interval);
+    // 如果 G.popup 存在，且 _tabId 不存在（未定义或为假值）
+    if (G.popup && !_tabId) {
+        alert(" G.popup && !_tabId ");// TODO：调试用，后续可删除或替换为日志
+    }
+    // 如果存在 _tabId，表示当前处于侧边面板模式，可以设置 body 宽度为 100% 等样式操作（调试用）
+    if (_tabId) {
+        alert(" 侧边面板模式 body 宽度100% ");  // TODO：调试用，可后续改为样式控制或日志
+    }
+    // 获取页面DOM
+    // 向当前活动 Tab（G.tabId）发送消息，请求获取页面 DOM 结构
+    // 消息内容为 {Message: "getPage"}，目标 frame 为 frameId: 0（通常是主框架）
+    chrome.tabs.sendMessage(G.tabId, {Message: "getPage"}, {frameId: 0}, function (data) {
+        if (chrome.runtime.lastError) return; // 如果发送消息出错（比如 tab 已关闭），直接退出
+        alert("  获取页面DOM "); // TODO：调试用，表示已尝试获取页面 DOM
+    });
+    // 填充数据
+    // 向 Chrome 扩展自身（通过 chrome.runtime.id）发送消息，请求获取当前 tabId 关联的数据
+    // 消息内容为 {Message: "getData", tabId: G.tabId}
+    chrome.runtime.sendMessage(chrome.runtime.id, {Message: "getData", tabId: G.tabId}, function (data) {
+        // 如果返回的数据不存在，或者仅仅是字符串 "OK"，则表示当前 tab 没有数据
+        if (!data || data === "OK") {
+            // 设置提示元素 $tips 的文本内容为 i18n.noData（比如 "暂无数据"）
+            $tips.textContent = i18n.noData;
+            // 同时设置一个自定义属性，用于国际化绑定
+            $tips.setAttribute("data-i18n", "noData");
+            return // 直接返回
+        }
+        // 如果有数据，记录当前数据条数
+        currentCount = data.length;
+        // 如果数据条数超过或等于 500
+        if (currentCount >= 500) {
+            alert(" currentCount >= 500 ！！！！"); // TODO：调试用，数据量大时提醒
+        }
+        // 遍历数据，为每一项数据生成动态 DOM 元素，并追加到某个容器中
+        for (let index = 0; index < currentCount; index++) {
+            // 根据数据项生成一段 DOM 结构
+            $current.append(addDynamicMedia(data[index])); // 构建当前项的 DOM
+        }
+        // 最后将这一批动态生成的 DOM 元素（$current div）追加到页面中某个父容器（$mediaList #media-list） 中
+        $mediaList.append($current);
+    });
+    console.log(" 等待 G 全局变量加载完整的操作 ");
+}, 0); // 每隔 0ms 检查一次（实际是尽快执行，但由浏览器调度，不保证真正 0ms 间隔）
+
 /**
  * toggleUI
  * @author LiuQi
  */
 function toggleUI(id) {
-    console.log("UI 状态已切换 " ,id);
+    console.log("UI 状态已切换 ", id);
 }
 
