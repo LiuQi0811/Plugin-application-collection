@@ -366,15 +366,21 @@ function addDynamicMedia(data, currentTab = true) {
     data.html.querySelector("input").addEventListener("click", function () {
         alert(" checkbox .......");
     });
+    // 使用 Object.defineProperty 为 data 对象定义一个名为 "checked" 的访问器属性（getter / setter）
+    // 对外提供一个统一的属性 checked，用于获取或设置该数据项的选中状态，同时同步内部状态和 UI
     Object.defineProperty(data, "checked", {
         get() {
+            // 当外部读取 data.checked 时，返回内部存储的状态 _checked
             return data._checked;
         },
         set(newValue) {
+            // 当外部设置 data.checked = true/false 时：
+            // 更新内部状态 _checked
             data._checked = newValue;
+            // 同步更新页面上对应的复选框 DOM 元素的选中状态（input 元素）
             data.html.querySelector("input").checked = newValue;
         }
-    })
+    });
 
     // 使用Map 储存数据
     allData.get(currentTab).set(data.requestId, data);
@@ -429,24 +435,34 @@ tabButtons.forEach(function (button, index) {
 
 // TODO 复制选中文件
 
-// TODO 全选 反选
-// 全选
+// 全选 反选 实现点击【全选】和【反选】按钮的交互
+
 document.getElementById("all-select")
+    // 全选 【全选】按钮点击事件：点击后调用 updateSelection(true) 尝试全选所有数据项
     .addEventListener("click", () => updateSelection(true));
 // 反选
 document.getElementById("invert-selection")
+    //【反选】按钮点击事件：点击后调用 updateSelection(false) 尝试反向选择所有数据项
     .addEventListener("click", () => updateSelection(false));
 
+/**
+ * updateSelection  根据参数 isSelectAll 来执行【全选】或【反选】操作
+ * @param {boolean} isSelectAll - 是否为“全选”操作；true 表示全选，false 表示反选
+ * @author LiuQi
+ */
 function updateSelection(isSelectAll) {
-    checkboxState = !checkboxState;
+    // 定义一个 checked 变量
     let checked = false;
-    if (isSelectAll) {
+    if (isSelectAll) { // 如果是全选操作，强制设置 checked 为 true
         checked = true;
-        checkboxState = true;
     }
+    // 遍历当前页面的所有数据项
     getData().forEach(function (data) {
+        // 如果是全选，则将所有项设为 checked（true）
+        // 如果是反选，则将每个项的选中状态取反（data.checked = !data.checked）
         data.checked = checked ? checked : !data.checked;
     });
+    // 更新合并下载按钮状态
     mergeDownButton();
 }
 
