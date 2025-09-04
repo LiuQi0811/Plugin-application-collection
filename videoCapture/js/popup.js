@@ -2,6 +2,8 @@
 const params = new URL(location.href).searchParams;
 const _tabId = parseInt(params.get("tabId"));
 const _type = params.get("type");
+// 复选框状态 点击返回或者全选后 影响新加入的资源 复选框勾选状态
+let checkboxState = true;
 // 当前页面
 const $mediaList = document.getElementById("media-list");
 const $current = document.createElement("div");
@@ -19,9 +21,12 @@ const $tips = document.getElementById("tips");
 const $down = document.getElementById("down");
 const $mergeDown = document.getElementById("merge-down");
 // 储存所有资源数据
+// 使用 Map 结构，包含两个内部 Map：
+// - true: 表示当前页面（activeTab）的资源数据
+// - false: 表示其他页面的资源数据
 const allData = new Map([
-    [true, new Map()], // 当前页面
-    [false, new Map()], // 其他页面
+    [true, new Map()], // 当前页面的数据
+    [false, new Map()], // 其他页面的数据
 ]);
 // 筛选
 const $filter_ext = document.querySelector("#filter #ext");
@@ -303,41 +308,49 @@ function addDynamicMedia(data, currentTab = true) {
         }
         return false; // 阻止默认行为或冒泡
     });
+
     // 二维码
     data.html.querySelector("#qrcode")
         .addEventListener("click", function () {
             alert(" 二维码！！！！ ");
         });
+
     // 下载器
     data.html.querySelector("#capture-down")
         .addEventListener("click", function () {
             alert(" 下载器！！！ ");
         });
+
     // 拷贝 - 点击复制网址
     data.html.querySelector("#copy")
         .addEventListener("click", function () {
             alert(" 拷贝！！！");
         });
+
     // 发送到Aria2
     data.html.querySelector("#aria2")
         .addEventListener("click", function () {
             alert(" aria2！！！");
         });
+
     // 下载
     data.html.querySelector("#download")
         .addEventListener("click", function () {
             alert(" 下载！！！");
         });
+
     // 调用
     data.html.querySelector(".invoke")
         .addEventListener("click", function (event) {
             alert(" 调用！！！");
         });
+
     // 播放
     data.html.querySelector("#play")
         .addEventListener("click", function () {
             alert(" 播放！！！");
         });
+
     // 解析
     data.html.querySelector("#parsing")
         .addEventListener("click", function (event) {
@@ -346,7 +359,25 @@ function addDynamicMedia(data, currentTab = true) {
 
 
     // TODO OTHER ......
+    // 多选框 创建checked属性 值和checked状态绑定
+    data._checked = checkboxState;
+    data.html.querySelector(".down-check").checked = data._checked;
+    // 复选框 点击处理事件
+    data.html.querySelector("input").addEventListener("click", function () {
+        alert(" checkbox .......");
+    });
+    Object.defineProperty(data, "checked", {
+        get() {
+            return data._checked;
+        },
+        set(newValue) {
+            data._checked = newValue;
+            data.html.querySelector("input").checked = newValue;
+        }
+    })
 
+    // 使用Map 储存数据
+    allData.get(currentTab).set(data.requestId, data);
     console.log(" .......", allData)
     // 返回生成的 DOM 结构
     return data.html;
@@ -384,10 +415,40 @@ tabButtons.forEach(function (button, index) {
         // 判断全局函数 toggleUI 是否存在并且是一个函数
         // 如果是，则调用它，通常用于处理额外的 UI 状态切换逻辑
         // 比如：切换菜单显示、更新图标、发送统计数据等
-        if (typeof toggleUI === "function") toggleUI(this.id);
+        if (typeof toggleUI === "function") toggleUI();
         // TODO: 其它需要操作的 DOM 元素，比如隐藏 filter、unfold、features 等
     });
 });
+
+
+// TODO 其他页面
+
+// TODO 下载选中文件
+
+// TODO 合并下载
+
+// TODO 复制选中文件
+
+// TODO 全选 反选
+// 全选
+document.getElementById("all-select")
+    .addEventListener("click", () => updateSelection(true));
+// 反选
+document.getElementById("invert-selection")
+    .addEventListener("click", () => updateSelection(false));
+
+function updateSelection(isSelectAll) {
+    checkboxState = !checkboxState;
+    let checked = false;
+    if (isSelectAll) {
+        checked = true;
+        checkboxState = true;
+    }
+    getData().forEach(function (data) {
+        data.checked = checked ? checked : !data.checked;
+    });
+    mergeDownButton();
+}
 
 // 等待 G 全局变量加载完整的操作
 // 使用 setInterval 轮询检查
@@ -436,15 +497,113 @@ const interval = setInterval(function () {
         }
         // 最后将这一批动态生成的 DOM 元素（$current div）追加到页面中某个父容器（$mediaList #media-list） 中
         $mediaList.append($current);
+        // toggleUI
+        toggleUI();
     });
     console.log(" 等待 G 全局变量加载完整的操作 ");
 }, 0); // 每隔 0ms 检查一次（实际是尽快执行，但由浏览器调度，不保证真正 0ms 间隔）
 
 /**
- * toggleUI
+ * toggleUI 根据当前数据状态动态更新用户界面（UI），包括提示信息、计数、按钮状态等
  * @author LiuQi
  */
-function toggleUI(id) {
-    console.log("UI 状态已切换 ", id);
+function toggleUI() {
+    // 获取当前页面的数据条数
+    const size = getData().size;
+    // 根据数据量决定“暂无数据”提示的显示与内容
+    size > 0
+        ? $tips.style.display = "none" // 有数据，隐藏提示
+        : ($tips.style.display = "block", $tips.textContent = i18n.noData); // 无数据，显示提示文本
+    // 更新当前数量显示
+    $currentCount.textContent = currentCount ? `[${currentCount}]` : "";
+    // 更新总数量显示
+    $allCount.textContent = allCount ? `[${allCount}]` : "";
+    // 检查当前显示的是哪个标签页
+    const id = document.querySelector(".tab-show")?.id;
+    if (id !== "media-list" && id !== "all-media-list") { // 如果当前不是媒体列表相关标签页，则隐藏提示和下载按钮，并弹出当前标签页信息
+        $tips.style.display = "none";
+        $down.style.display = "none";
+        alert("当前选项卡：" + id);
+    } else if (window.getComputedStyle($down).display === "none") {  // 如果下载按钮当前是隐藏状态，则显示它
+        alert(" :hidden ")
+        $down.style.display = "block";
+    }
+    // 更新图标
+    // 获取所有 class="faviconFlag" 的 DOM 元素（NodeList）
+    const faviconFlags = document.querySelectorAll('.favicon-flag');
+    // 遍历每一个元素
+    faviconFlags.forEach(function () {
+        alert(" faviconFlags.forEach ")
+    });
+    // 弹出当前检测到的视频数量以及是否支持合并的提示
+    alert("  当前嗅到视频数量 是否可以支持合并：" + (size >= 2));
+    // 如果数据条数大于等于 2，说明可以尝试合并，启用合并下载按钮；否则禁用
+    size >= 2 ? mergeDownButton() : $mergeDown.setAttribute("disabled", true);
+}
+
+/**
+ * mergeDownButton 合并下载按钮处理
+ * @author LiuQi
+ */
+function mergeDownButton() {
+    // getCheckedData 获取当前标签 所有选择的文件
+    getCheckedData();
+    // mergeDownButtonCheck 进行合并下载前的校验
+    mergeDownButtonCheck();
+}
+
+/**
+ * mergeDownButtonCheck 合并下载校验
+ * @author LiuQi
+ */
+function mergeDownButtonCheck() {
+    console.warn("  mergeDownButtonCheck 合并下载按钮 校验处理 ");
+}
+
+/**
+ * getCheckedData 获取当前标签 所有选择的文件
+ * 获取当前标签页中所有被选中（checked=true）的文件数据，同时计算这些文件中的最大文件大小
+ * @author LiuQi
+ */
+function getCheckedData() {
+    // 用于存放所有被选中的数据
+    const checkedData = [];
+    // 用于记录最大的文件大小
+    let maxSize = 0;
+    // 遍历当前页面的所有数据
+    getData().forEach(function (data) {
+        if (data.checked) { // 数据项被选中
+            // 获取文件大小，如果不存在则默认为 0
+            const size = data._size ?? 0;
+            // 更新最大文件大小
+            maxSize = size > maxSize ? size : maxSize;
+            // 将选中的数据加入数组
+            checkedData.push(data);
+        }
+    });
+    // 返回选中的数据数组和最大文件大小
+    return [checkedData, maxSize];
+}
+
+
+/**
+ * getData 根据 requestId 获取对应的数据对象
+ * @param {boolean|string} requestId - 可选，资源的唯一标识符
+ * @author LiuQi
+ */
+function getData(requestId = false) {
+    if (requestId) { // 如果指定了 requestId，返回当前活跃标签页中该 requestId 对应的数据
+        return allData.get(activeTab).get(requestId);
+    }
+    // 如果未指定 requestId，返回当前活跃标签页的全部数据
+    return allData.get(activeTab);
+}
+
+/**
+ * getAllData 获取所有页面的全部数据
+ * @author LiuQi
+ */
+function getAllData() {
+    // TODO 获取所有页面的全部数据（待实现）
 }
 
