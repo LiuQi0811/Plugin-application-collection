@@ -128,8 +128,9 @@ function addDynamicMedia(data, currentTab = true) {
     // 是否需要解析的标记，默认为 false
     data.parsing = false;
     // 判断当前数据是否为某些特殊格式（如 M3U8、MPD、JSON），目前只是打印日志
-    if (isM3U8(data)) {
-        console.log(" // TODO  popup.js addDynamicMedia  if(isM3U8(data)) .......");
+    if (isM3U8(data)) { // M3U8数据类型
+        // M3U8 解析标记
+        data.parsing = "m3u8";
     } else if (isMPD(data)) {
         console.log(" // TODO  popup.js addDynamicMedia  if(isMPD(data)) .......");
     } else if (isJSON(data)) {
@@ -260,7 +261,7 @@ function addDynamicMedia(data, currentTab = true) {
             // 如果不是播放按钮，则隐藏 urlPanel（比如点击的是面板头部，但不是播放按钮）
             data.urlPanel.style.display = "none"; // 隐藏 .url 面板
             // 如果预览视频正在播放，则暂停它
-            !preview[0]?.paused && preview.pause();
+            !preview?.paused && preview.pause();
             return false;
         }
         // 情况2：当前是 “显示 .url 面板” 的状态
@@ -269,8 +270,34 @@ function addDynamicMedia(data, currentTab = true) {
             // 设置状态为已初始化，避免重复处理
             mediaInfo.dataset.state = "true";
             // 判断当前数据类型，分别处理 M3U8、图片、或其他类型
-            if (isM3U8(data)) {
-                alert("isM3U8 ");  // 如果是 M3U8 流（比如直播或 HLS），弹出提示（可扩展为加载 M3U8 播放器）
+            if (isM3U8(data)) { // 如果是 M3U8 流（比如直播或 HLS）
+                // Hls 使用 Hls.js 加载 M3U8 视频流
+                const hls = new Hls({enableWorker: false}); // 禁用 Web Worker 以简化调试和兼容性
+                // 设置请求头并加载 M3U8 源
+                setRequestHeaders(data.requestHeaders, function () {
+                    hls.loadSource(data.url); // 加载 M3U8 播放列表地址
+                    hls.attachMedia(preview); // 将 HLS 实例绑定到 video 元素（preview）
+                });
+                // 当 HLS 缓冲区创建时触发，用于检测音视频轨道是否存在
+                hls.on(Hls.Events.BUFFER_CREATED, function (event, data) {
+                    if (data.tracks && !data.tracks.audiovideo) { // 如果没有合并的音视频轨道
+                        // 没有音频轨道，显示提示
+                        !data.tracks.audio && mediaInfo.insertAdjacentHTML('beforeend', `<br><b>${i18n.noAudio}</b>`);
+                        // 没有视频轨道，显示提示
+                        !data.tracks.video && mediaInfo.insertAdjacentHTML('beforeend', `<br><b>${i18n.noVideo}</b>`);
+                    }
+                });
+                // 当 HLS 出现错误时停止加载，避免继续报错或卡死
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    hls.stopLoad(); // 停止加载流
+                });
+                // 当 M3U8 清单（manifest）解析完成后触发，用于显示是否为播放列表
+                hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+                    if (data.levels.length > 1 && !mediaInfo.textContent.includes(i18n.m3u8Playlist)) {
+                        // 如果有多个清晰度级别（即播放列表），且尚未显示提示，则添加提示
+                        mediaInfo.insertAdjacentHTML('beforeend', `<br><b>${i18n.m3u8Playlist}</b>`);
+                    }
+                });
             } else if (data.isPlay) { // 如果是可播放的视频类型（比如 MP4 等）
                 // 设置网络请求头
                 setRequestHeaders(data.requestHeaders, function () {
