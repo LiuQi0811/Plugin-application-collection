@@ -415,10 +415,21 @@ function filterFileName(str, text) {
     str = str.replaceAll(/\u200B/g, "") // 移除零宽空格（U+200B）
         .replaceAll(/\u200C/g, "") // 移除零宽非连接符（U+200C）
         .replaceAll(/\u200D/g, ""); // 移除零宽连接符（U+200D）
-    // 使用预定义的正则表达式（reFilterFileName）匹配非法字符，并记录匹配项（调试用）
+    // 使用预定义的正则表达式（reFilterFileName）匹配非法字符，并记录匹配项
     str.replace(reFilterFileName, function (match) {
-        // 调试日志：输出非法字符匹配项
-        console.log("// TODO function.js filterFileName by MATCH ", match)
+        // 输出非法字符匹配项
+        // 定义一个对象，用于映射非法字符到其对应的转义或替代字符：
+        // 将一些在文件名中通常不允许的特殊字符替换为 HTML 实体或安全的替代字符
+        return text || {
+            "<": "&lt;", // 小于号替换为 HTML 实体 &lt;
+            ">": "&gt;", // 大于号替换为 HTML 实体 &gt;
+            ":": "&colon;", // 冒号替换为自定义实体 &colon;（或可替换为其他安全字符）
+            '"': "&quot;", // 双引号替换为 HTML 实体 &quot;
+            "|": "&vert;", // 竖线符号替换为自定义实体 &vert;（或可用其他替代如 _）
+            "?": "&quest;", // 问号替换为 HTML 实体 &quest;
+            "*": "&ast;", // 星号替换为 HTML 实体 &ast;
+            "~": "_" // 波浪号直接替换为下划线 _
+        }[match];// 根据匹配到的字符 match，返回对应的替换值
     });
     // 如果最后一位是"." chrome.download 无法下载/处理文件名以点号结尾的情况（Chrome下载限制）
     if (str.endsWith(".")) {
@@ -608,4 +619,34 @@ function seconds2Time(seconds) {
     time += seconds.toString().padStart(2, "0");
     // 返回最终格式的时间字符串，例如 "1:02:05" 或 "02:05"
     return time;
+}
+
+/**
+ * openParser 打开解析器
+ * 根据传入的数据和选项，构造一个 URL 并在新的浏览器标签页中打开解析页面
+ * @param {Object} data - 包含解析所需的核心数据，如 URL、标题、文件名等
+ * @param {Object} [options={}] - 可选参数，用于控制标签页行为或其他附加配置
+ * @author LiuQi
+ */
+function openParser(data, options = {}) {
+    // 根据标签ID 获取当前活跃的标签页信息
+    chrome.tabs.get(G.tabId, function (tab) {
+        // 构造目标解析页面的路径和查询参数
+        const url = `/${data.parsing ? data.parsing : "m3u8"}.html?${new URLSearchParams({
+            url: data.url, // 要解析的原始媒体资源 URL
+            title: data.title, // 媒体资源的标题
+            filename: data.downFileName, // 下载的文件名
+            tabid: data.tabId === -1 ? G.tabId : data.tabId, // 当前操作的标签页 ID，如果为 -1 则使用全局 G.tabId
+            initiator: data.initiator, // 发起请求的源头
+            requestHeaders: data.requestHeaders ? JSON.stringify(data.requestHeaders) : undefined, // 请求头信息，以 JSON 字符串传递
+            // 遍历 options 对象，将布尔值转换为 1 其他类型保持原类型
+            ...Object.fromEntries(Object.entries(options).map(([key, value]) => [key, typeof value === 'boolean' ? 1 : value])),
+        })}`;
+        // 在浏览器中创建（打开）一个新的标签页
+        chrome.tabs.create({
+            url, // 资源地址
+            index: tab.index + 1, // 新标签页位置在当前标签页之后
+            active: G.isMobile || !options.autoDown // 是否激活（聚焦）新标签页：如果是移动端（G.isMobile 为 true）或者未设置自动下载（autoDown 为 false/undefined）激活，否则不激活
+        });
+    });
 }
