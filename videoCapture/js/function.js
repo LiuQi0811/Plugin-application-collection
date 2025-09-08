@@ -130,9 +130,8 @@ function setRequestHeaders(data = {}, callback = undefined) {
                     "resourceTypes": ["xmlhttprequest", "media", "image"] // 仅对这几种资源类型的请求生效
                 }
             }];
-            if (tabs) {
-                // 如果是在某个具体的标签页上下文中（比如插件按钮点击时在某个网页内触发）
-                console.log(" // TODO function.js TABS")
+            if (tabs) { // 如果是在某个具体的标签页上下文中（比如插件按钮点击时在某个网页内触发）
+                rules.addRules[0].condition.tabIds = [tabs.id];
             } else {
                 // 如果不是在具体标签页中（比如在后台脚本、弹窗、options 页等调用）
                 // 检查当前浏览器是否支持 initiatorDomains 字段
@@ -649,4 +648,94 @@ function openParser(data, options = {}) {
             active: G.isMobile || !options.autoDown // 是否激活（聚焦）新标签页：如果是移动端（G.isMobile 为 true）或者未设置自动下载（autoDown 为 false/undefined）激活，否则不激活
         });
     });
+}
+
+
+/**
+ * JSONParse 尝试解析 JSON 字符串，如果第一次解析失败，会尝试对字符串进行简单修复后再次解析
+ * @param {string} str - 待解析的 JSON 格式字符串
+ * @param {Object} error - 解析失败时返回的默认错误对象（默认为空对象 {}）
+ * @param {number} attempt - 当前尝试解析的次数（内部递归使用，默认为 0）
+ * @author LiuQi
+ */
+function JSONParse(str, error = {}, attempt = 0) {
+    if (!str) return error; // 如果传入字符串为空，直接返回错误对象
+    try {
+        // 尝试直接解析 JSON
+        return JSON.parse(str);
+    } catch (e) {
+        if (attempt === 0) {
+            // 第一次解析失败，修正字符串后递归调用
+            reJSONParse.lastIndex = 0;
+            // 重置正则匹配位置
+            const fixedStr = str.replace(reJSONparse, '$1"$2"$3');
+            // 递归调用，尝试修复后再次解析，attempt 计数加一
+            return JSONParse(fixedStr, error, ++attempt);
+        } else {
+            // 第二次解析仍然失败，返回 error 对象
+            return error;
+        }
+    }
+}
+
+/**
+ * awaitVariableG
+ * 等待全局变量 G 中的 initializeSyncComplete 和 initializeLocalComplete 同时为 true 后执行回调
+ * @param {Function} callback - 条件满足后要执行的回调函数
+ * @param {number} seconds - 检查间隔时间，默认为 0 毫秒（即不延迟，立即开始检查）
+ */
+function awaitVariableG(callback, seconds = 0) {
+    const timer = setInterval(function () {
+        // 当 G 中的两个初始化标志都为 true 时，认为初始化完成
+        if (G.initializeSyncComplete && G.initializeLocalComplete) {
+            // 停止定时器
+            clearInterval(timer);
+            // 执行传入的回调函数
+            callback();
+        }
+    }, seconds);// 每隔指定的秒数检查一次
+}
+
+/**
+ * loadedCSS
+ * 动态加载 CSS 样式：根据是否移动端加载不同的样式文件，并注入一段内联样式
+ * @author LiuQi
+ */
+function loadedCSS() {
+    if (G.isMobile) { // 移动端
+        const mobileCssLink = document.createElement("link");
+        mobileCssLink.rel = "stylesheet";
+        mobileCssLink.type = "text/css";
+        mobileCssLink.href = "css/mobile.css";
+        document.head.appendChild(mobileCssLink);
+    }
+    // 创建一个 <style> 标签，将 G.css 中的内联 CSS 注入到页面
+    const styleElement = document.createElement("style");
+    styleElement.textContent = G.css;
+    document.head.appendChild(styleElement);
+}
+
+
+/**
+ * fetchData 通用的 fetch 数据请求方法
+ * @param {string} url - 请求地址
+ * @param {'text' | 'json'} responseType - 期望的响应类型，'text' 或 'json'
+ * @returns {Promise<string | any>} 返回文本或 JSON 数据
+ * @throws {Error} - 当 HTTP 请求失败或响应类型不支持时抛出错误
+ */
+async function fetchData(url, responseType = "json") {
+    const response = await fetch(url); // 发起 fetch 请求
+    if (!response.ok) {
+        // 抛出 HTTP 错误
+        throw new Error(`HTTP 错误！状态码: ${response.status} ${response.statusText}`);
+    }
+
+    if (responseType === "text") {
+        return await response.text(); // 返回文本
+    } else if (responseType === "json") {
+        return await response.json(); // 返回 JSON
+    } else {
+        // 异常错误
+        throw new Error(`不支持的 responseType: ${responseType}，请使用 'text' 或 'json'`);
+    }
 }
