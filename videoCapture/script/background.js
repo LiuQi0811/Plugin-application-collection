@@ -187,7 +187,23 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     // 获取各按钮状态
     // 模拟手机 自动下载 启用 以及各种脚本状态
     if (message.Message === "getButtonState") {
-        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'getButtonState') ... ");
+        let state = {
+            // 移动端用户代理
+            MobileUserAgent: G.featMobileTabId.has(message.tabId),
+            // 自动下载
+            AutoDown: G.featAutoDownTabId.has(message.tabId),
+            // 启用
+            enable: G.enable,
+        };
+        // 遍历全局的脚本列表
+        G.scriptList.forEach((item) => {
+            // 脚本列表中的每一项，检查其对应的 tabId 集合中是否包含当前 message.tabId
+            // 将结果以 item.key 为属性名，存储到 state 对象中
+            state[item.key] = item.tabId.has(message.tabId);
+        });
+        // 将构建好的状态对象通过 sendResponse 方法返回给调用方
+        sendResponse(state);
+        return true;
     }
     // 对tabId的标签 进行模拟手机操作
     if (message.Message === "mobileUserAgent") {
@@ -199,7 +215,40 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     }
     // 对tabId的标签 脚本注入或删除
     if (message.Message === "script") {
-        console.log(" // TODO background.js chrome.runtime.onMessage if(message.Message == 'script') ... ");
+        // 检查当前请求的脚本（message.script）是否存在于全局的脚本列表 G.scriptList 中
+        if (!G.scriptList.has(message.script)) {
+            // 如果不存在，向发送方返回错误信息，并终止处理
+            sendResponse("Error no exists");
+            return false;
+        }
+        // 获取当前请求的脚本对象
+        const script = G.scriptList.get(message.script);
+        // 获取该脚本所关联的标签页ID集合
+        const scriptTabId = script.tabId;
+        // 获取该脚本的刷新配置，如果消息中没有传递 refresh 参数，则使用脚本默认的 refresh 值
+        const refresh = message.refresh ?? script.refresh;
+        if (scriptTabId.has(message.tabId)) { // 当前标签页（message.tabId）是否已经在该脚本的 tabId 集合中（即是否已启用该脚本）
+            //如果已启用，则从集合中移除
+            scriptTabId.delete(message.tabId);
+            if (message.script === "search.js") { // 当前操作针对的脚本是 "search.js"，则记录当前标签页被临时关闭了深度搜索功能
+                G.deepSearchTemporarilyClose = message.tabId;
+            }
+            // 如果配置了刷新（refresh 为 true），则重新加载当前标签页，并跳过缓存
+            refresh && chrome.tabs.reload(message.tabId, {bypassCache: true});
+            // 向发送方返回操作成功的信息
+            sendResponse("OK");
+            return true;
+        }
+        // message.tabId 添加到脚本的 tabId 集合中
+        scriptTabId.add(message.tabId);
+        if (refresh) { // 如果配置了刷新（refresh 为 true），则重新加载当前标签页，并跳过缓存
+            chrome.tabs.reload(message.tabId, {bypassCache: true});
+        } else {
+            console.warn(" //TODO else refresh ..........")
+        }
+        // 向发送方返回操作成功的信息
+        sendResponse("OK");
+        return true;
     }
     // 脚本注入 脚本申请多语言文件
     if (message.Message === "scriptI18n") {
@@ -319,9 +368,24 @@ chrome.webNavigation.onCommitted.addListener(function (details) {
         console.log(" // TODO if (G.deepSearch && G.deepSearchTemporarilyClose != details.tabId) ...... ");
     }
     // capture-script 脚本
-    G.scriptList.forEach(function (item, script) {
+    G.scriptList.forEach(function (item, script) { // 遍历全局的脚本列表 G.scriptList，对每一个注册的脚本项进行处理
+        // 如果当前标签页（details.tabId）不在该脚本的启用标签页集合中（item.tabId），或者该脚本不支持所有框架（item.allFrames 为 false），则跳过此次处理
         if (!item.tabId.has(details.tabId) || !item.allFrames) return true;
-        console.log(" // TODO background.js capture-script 脚本 .....", item, script);
+        // 构建要注入的脚本文件路径数组，默认只注入当前脚本文件：`capture-script/${script}`
+        const files = [`capture-script/${script}`];
+        // 如果该脚本项配置了 i18n（国际化支持），则优先注入国际化脚本 `capture-script/i18n.js`
+        item.i18n && files.unshift("capture-script/i18n.js");
+        // 使用 Chrome 的 scripting API 注入脚本到指定的标签页和框架中
+        chrome.scripting.executeScript({
+            // 指定注入目标：标签页 ID 和框架 ID
+            target: {tabId: details.tabId, frameIds: [details.frameId]},
+            // 指定要注入的脚本文件路径数组
+            files,
+            // 设置为 true 表示尽可能立即注入（而不是等待页面加载完成等时机）
+            injectImmediately: true,
+            // 指定脚本运行的世界：可以是 'MAIN'（主世界，与页面JS同环境）或 'ISOLATED'（隔离世界，默认）
+            world: item.world
+        });
     });
 });
 
